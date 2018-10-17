@@ -1,0 +1,102 @@
+setwd("~/Google Drive/STU_France/Food Allergy - RCSA/code")
+
+#installing deSolve Package
+if(!"deSolve"%in%rownames(installed.packages())){install.packages("deSolve", dependencies = T)}
+if(!"readxl"%in%rownames(installed.packages())){install.packages("readxl", dependencies = T)}
+library(deSolve)
+library(readxl)
+
+
+########################
+##################Model
+
+########################
+#########
+#reading in parameter IC data
+# dir()
+# parm_table <- read_xlsx('Parameter_Dictionaryxlsx', sheet = 1) #col_types = c('guess', 'text','numeric','text'))
+ # IC_table <- read_xlsx('Parameter_Dictionaryxlsx', sheet = 2)#col_types = c('guess', 'text','numeric','text'))
+# parmlist = list()
+# for (i in 1:length(parm_table$Parameter)){
+# parmlist[i] = assign(parm_table$Parameter[i],parm_table$Value[i])
+# }
+
+#The parameters 
+(parms <- c(
+ b = 15,
+ cee = 05,
+ h = 075,
+ j = 2,
+ k = 125,
+ m = 0166666666666667,
+ u = 03,
+ nu = 0837,
+ p = 10^4,
+ q = 02343,
+ r = 4000,
+ s = 0324,
+ w = 1,
+ Tn = 10^4,
+ Ds = 10^4,
+ A = 10^4,
+ V = 10^4)
+)
+
+for(i in 1:length(parms))parms[i] <- 0
+parms['V'] <- 0
+parms['Ds'] <- 10
+parms['Tn'] <- 0
+parms['p'] <- 10
+parms['V'] <- 0
+parms['A'] <- 10
+parms['b'] <- parms['m'] <- parms['u'] <- parms['q'] <- 1
+
+parms
+parms['b']*parms['Ds']*parms['A']/parms['m']
+
+## vector of timesteps
+times <- seq(0, 250.0, by = 0.01)## finer timestep due to large rates
+
+
+AllergyMod <- function(t, x, parms) {
+ with(as.list(c(parms, x)), {
+ 
+ #### Dendritic. Cells with Milk
+ dDm <- b*Ds*A - cee*Dm*C4 - k*Dm*C2 - m*Dm
+ 
+ #### Dendritic Cell carrying IL-4 in Lymph Node 
+ dDL4 <- cee*Dm*C4 - m*DL4
+ 
+ #### Dendritic Cell carrying IL-2 in Lymph Node
+ dDL2 <- k*Dm*C2 - m*DL2
+ 
+ #### Th-2 Cells (these guys produce IL-4)
+ dT2 <- p + j*Tn*DL4 - u*T2
+ 
+ #IL-4 Cytokine (these guys cause allergic reaction)
+ dC4 <- nu*T2 - q*C4
+ 
+ #IL-2 Cytokine (these guys do not cause allergic reaction)
+ dC2 <- nu*T1 - q*C2
+ 
+ #### Th-1 Cells (these guys produce IL-2)
+ dT1 <- p + s*V*Tn*DL2 - u*T1
+ 
+ #############work on this one
+ list(c(dDm, dDL4, dDL2, dT2, dC4, dC2, dT1)) # the output
+ })
+}
+
+(xstart <- c(Dm = 1.0, DL4 = 0, DL2 = 0, T2 = 1.0, C4 = 0, C2 = 0, T1 = 1.0))
+
+#results data
+output <- as.data.frame(rk4(xstart, times, AllergyMod, parms))## could make error checking changes here
+head(output)
+tail(output)
+# matplot(output$time, output[, c("T2")], type = 'l',col = c("red"),xlab = "Days",ylab = "Population", main = "Helper Th-2 Cell Populations")
+# legend("topright",legend = c("Th-2"), col = c("red"), lty = 1, cex = 4)
+
+
+matplot(output$time, output[, c("Dm", "DL4", "DL2")], type = 'l', xlim = c(0, 50), ylim = c(0, 10^6))
+matplot(output$time, output[, c("T2", "T1")], type = 'l', xlim = c(0, 50), ylim = c(0, 10)) 
+#matplot(output$time, output[, c("C4", "C2")], type = 'l', xlim = c(0, 50), ylim = c(0, 10^6))
